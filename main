@@ -1,0 +1,236 @@
+import pygame
+import time
+import random
+from pygame.locals import *
+import os
+
+size = 20
+background_color = (0, 0, 0)
+
+global high_score
+
+if os.path.exists('score.txt'):
+    with open('score.txt', 'r') as file:
+        high_score = int(file.read())
+else:
+    high_score = 0
+
+class Apple():
+    def __init__(self, parent_screen):
+        self.block = pygame.image.load("ressources/apple.png").convert()
+        self.parent_screen = parent_screen
+        self.x = 120
+        self.y = 120
+
+    def draw(self):
+        self.parent_screen.blit(self.block,(self.x, self.y))
+        pygame.display.flip()
+
+    def move(self):
+        self.x = random.randint(0,20)*size
+        self.y = random.randint(0,20)*size
+
+class Snake:
+    def __init__(self, parent_screen, length):
+        self.parent_screen = parent_screen
+        self.head_up = pygame.image.load("ressources/snake_head_up.png").convert()
+        self.head_down = pygame.image.load("ressources/snake_head_down.png").convert()
+        self.head_left = pygame.image.load("ressources/snake_head_left.png").convert()
+        self.head_right = pygame.image.load("ressources/snake_head_right.png").convert()
+        self.block = pygame.image.load("ressources/block.png").convert()
+        self.direction = 'down'
+
+        self.length = length
+        self.x = [40]*length
+        self.y = [40]*length
+        
+
+    def increase_length(self):
+        self.length += 1
+        self.x.append(-1)
+        self.y.append(-1)
+
+    def move_left(self):
+        self.direction = 'left'
+
+    def move_right(self):
+        self.direction = 'right'
+
+    def move_up(self):
+        self.direction = 'up'
+
+    def move_down(self):
+        self.direction = 'down'
+  
+    def draw(self):
+        self.parent_screen.fill((0, 0, 0))
+        for i in range(self.length):
+            if self.direction == 'left': 
+                self.parent_screen.blit(self.head_left,(self.x[0], self.y[0]))
+            if self.direction == 'right':
+                self.parent_screen.blit(self.head_right,(self.x[0], self.y[0]))
+            if self.direction == 'up':
+                self.parent_screen.blit(self.head_up,(self.x[0], self.y[0]))
+            if self.direction == 'down':
+                self.parent_screen.blit(self.head_down,(self.x[0], self.y[0]))
+            
+            self.parent_screen.blit(self.block,(self.x[i], self.y[i]))
+        pygame.display.flip()
+
+    def walk(self):
+        for i in range(self.length-1,0,-1):
+            self.x[i] = self.x[i - 1]
+            self.y[i] = self.y[i - 1]
+
+        if self.direction == 'left':
+            self.x[0] -= size
+        if self.direction == 'right':
+            self.x[0] += size
+        if self.direction == 'up':
+            self.y[0] -= size
+        if self.direction == 'down':
+            self.y[0] += size
+
+        self.draw()
+
+class Game():
+    def __init__(self):
+        pygame.init()
+        self.surface = pygame.display.set_mode((500, 500))
+
+        self.snake = Snake(self.surface, 2)
+        self.snake.draw()
+
+        self.apple = Apple(self.surface)
+        self.apple.draw()
+
+    def reset(self):
+        self.snake = Snake(self.surface, 2)
+        self.apple = Apple(self.surface)
+
+    def snake_collision(self, x1, y1, x2, y2):
+        if x1 >= x2 and x1 < x2 + size:
+            if y1 >= y2 and y1 < y2 + size:
+                return True
+
+        return False
+
+    def boundaries_collision(self):
+        if self.snake.x[0] > 500 - size or self.snake.y[0] > 500 - size or self.snake.x[0] < 0 or self.snake.y[0] < 0:
+            return True
+
+        return False
+ 
+    def play(self):
+        self.snake.walk()
+        self.apple.draw()
+        self.display_score()
+        self.display_highscore()
+        pygame.display.flip()
+
+        #snake colliding with apple
+        if self.snake_collision(self.snake.x[0], self.snake.y[0], self.apple.x, self.apple.y):
+            self.snake.increase_length()
+            self.apple.move()
+
+        #snake colliding with itself
+        for i in range(3, self.snake.length):
+            if self.snake_collision(self.snake.x[0], self.snake.y[0], self.snake.x[i], self.snake.y[i]):
+                raise "Game Over"       
+
+        # snake colliding with boundaries
+        if self.boundaries_collision():
+            raise "Game Over"
+        
+    def display_score(self):
+        font = pygame.font.Font("ressources/Arcade.ttf", 30)
+        self.score = self.snake.length - 2
+        display_score = font.render(f"Score: {self.score}", True, (255, 255, 255))
+        self.surface.blit(display_score, (370, 15)) 
+
+    def display_highscore(self):
+        global high_score
+        font = pygame.font.Font("ressources/Arcade.ttf", 30)
+        display_highscore = font.render(f"Highscore: {high_score}", True, (255, 255, 255))
+        self.surface.blit(display_highscore, (15, 15))
+
+    def update_highscore(self):
+        global high_score
+        if self.score > high_score:
+           high_score = self.score
+           with open('score.txt', 'w') as file:
+                file.write(str(high_score))
+            
+    def show_game_over(self):
+        self.surface.fill(background_color)
+        arcade_small = pygame.font.Font("ressources/Arcade.ttf", 20)
+        arcade_medium = pygame.font.Font("ressources/Arcade.ttf", 30)
+        gameover = pygame.font.Font("ressources/Game_Over.ttf", 65)
+
+        line1 = gameover.render(f"GAME OVER", True, (255,255,255))
+        self.surface.blit(line1, (20, 200))
+
+        line2 = arcade_medium.render(f"Score: {self.snake.length - 2}", True, (255,255,255))
+        self.surface.blit(line2, (370, 15))
+        line3 = arcade_medium.render(f"Highscore: {high_score}", True, (255,255,255))
+        self.surface.blit(line3, (15, 15))
+        line4 = arcade_small.render("To play again press Enter", True, (255,255,255))
+        self.surface.blit(line4, (15, 475))
+        line5 = arcade_small.render("To exit press Escape", True, (255,255,255))
+        self.surface.blit(line5, (300, 475))
+        
+        pygame.display.flip()
+
+    def velocity(self):
+        if self.score < 5 and self.score >= 0:
+            self.vel = time.sleep(0.15)
+        if self.score < 10 and self.score >= 5:
+            self.vel = time.sleep(0.12)
+        if self.score < 15 and self.score >= 10:
+            self.vel = time.sleep(0.10)
+        if self.score < 20 and self.score >= 15:
+            self.vel = time.sleep(0.08)
+        if self.score >= 20:
+            self.vel = time.sleep(0.05)
+
+    def run(self):
+        running = True
+        pause = False
+
+        while running:
+            for event in pygame.event.get():
+                if event.type == KEYDOWN:
+                    if event.key == K_ESCAPE:
+                        running = False
+
+                    if event.key == K_RETURN:
+                        pause = False
+
+                    if not pause:
+                        if event.key == K_LEFT or event.key == K_a:
+                            self.snake.move_left()
+                        if event.key == K_RIGHT or event.key == K_d:
+                            self.snake.move_right()
+                        if event.key == K_UP or event.key == K_w:
+                            self.snake.move_up()
+                        if event.key == K_DOWN or event.key == K_s:
+                            self.snake.move_down()
+
+                elif event.type == QUIT:
+                    running = False
+
+            try:
+                if not pause:
+                    self.play()
+
+            except Exception as e:
+                self.update_highscore()
+                self.show_game_over()
+                pause = True
+                self.reset()
+
+            self.velocity()
+
+if __name__ == "__main__":
+    game = Game()
+    game.run()            
